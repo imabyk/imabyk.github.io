@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Typing Practice App</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body class="bg-gray-100 flex flex-col h-screen">
+    <!-- Header -->
+    <header class="bg-blue-600 text-white p-4 flex justify-between items-center">
+        <h1 class="text-2xl font-bold">Typing Practice</h1>
+        <nav>
+            <select id="mode-selector" class="bg-blue-500 text-white p-2 rounded">
+                <option value="typing">Typing Practice</option>
+                <option value="quote">Random Quote</option>
+                <option value="code">Code Typing</option>
+            </select>
+        </nav>
+    </header>
+
+    <!-- Main Content Container -->
+    <div class="flex flex-grow">
+        <!-- Left Ad Placeholder -->
+        <div class="w-24 bg-gray-200 flex items-center justify-center">
+            Left Ad
+        </div>
+
+        <!-- Main App Content -->
+        <div class="flex-grow flex flex-col items-center justify-center p-4">
+            <!-- Typing Area -->
+            <div id="typing-container" class="w-full max-w-2xl bg-white p-6 rounded-lg shadow-md">
+                <div id="text-display" class="mb-4 text-lg text-gray-700 h-40 overflow-auto border p-2"></div>
+                
+                <div class="flex items-center mb-4">
+                    <button id="start-test" class="bg-green-500 text-white px-4 py-2 rounded mr-4">Start Test</button>
+                    <div id="timer" class="text-xl font-bold">00:00</div>
+                </div>
+
+                <textarea 
+                    id="typing-input" 
+                    rows="6" 
+                    class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Click 'Start Test' to begin typing..."
+                    disabled
+                ></textarea>
+
+                <!-- Results Display -->
+                <div id="results" class="mt-4 text-center">
+                    <div id="accuracy" class="text-xl font-bold text-green-600"></div>
+                    <div id="errors" class="text-xl text-red-600"></div>
+                    <div id="character-count" class="text-xl text-blue-600"></div>
+                    <div id="total-time" class="text-xl text-purple-600"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Ad Placeholder -->
+        <div class="w-24 bg-gray-200 flex items-center justify-center">
+            Right Ad
+        </div>
+    </div>
+
+    <!-- Top Ad Placeholder -->
+    <div class="h-16 bg-gray-300 flex items-center justify-center">
+        Top Ad Space
+    </div>
+
+    <script>
+        class TypingApp {
+            constructor() {
+                this.textDisplay = document.getElementById('text-display');
+                this.typingInput = document.getElementById('typing-input');
+                this.accuracyDisplay = document.getElementById('accuracy');
+                this.errorsDisplay = document.getElementById('errors');
+                this.characterCountDisplay = document.getElementById('character-count');
+                this.totalTimeDisplay = document.getElementById('total-time');
+                this.modeSelector = document.getElementById('mode-selector');
+                this.startTestButton = document.getElementById('start-test');
+                this.timerDisplay = document.getElementById('timer');
+
+                this.currentText = '';
+                this.startTime = null;
+                this.timerInterval = null;
+
+                this.init();
+            }
+
+            async init() {
+                this.bindEvents();
+                await this.fetchRandomText();
+            }
+
+            bindEvents() {
+                this.typingInput.addEventListener('input', () => this.trackTyping());
+                this.modeSelector.addEventListener('change', () => this.changeMode());
+                this.startTestButton.addEventListener('click', () => this.startTest());
+            }
+
+            async fetchRandomText() {
+                try {
+                    const response = await axios.get('https://baconipsum.com/api/?type=meat-and-filler&sentences=10');
+                    this.currentText = response.data[0];
+                    this.textDisplay.textContent = this.currentText;
+                    this.resetTyping();
+                } catch (error) {
+                    this.textDisplay.textContent = 'Failed to fetch text. Please try again.';
+                }
+            }
+
+            startTest() {
+                this.typingInput.disabled = false;
+                this.typingInput.focus();
+                this.startTestButton.disabled = true;
+                this.startTimer();
+            }
+
+            startTimer() {
+                this.startTime = new Date();
+                this.timerInterval = setInterval(() => {
+                    const currentTime = new Date();
+                    const elapsedTime = new Date(currentTime - this.startTime);
+                    const minutes = elapsedTime.getUTCMinutes().toString().padStart(2, '0');
+                    const seconds = elapsedTime.getUTCSeconds().toString().padStart(2, '0');
+                    this.timerDisplay.textContent = `${minutes}:${seconds}`;
+                }, 1000);
+            }
+
+            resetTyping() {
+                this.typingInput.value = '';
+                this.typingInput.disabled = true;
+                this.startTestButton.disabled = false;
+                this.accuracyDisplay.textContent = '';
+                this.errorsDisplay.textContent = '';
+                this.characterCountDisplay.textContent = '';
+                this.totalTimeDisplay.textContent = '';
+                this.timerDisplay.textContent = '00:00';
+                
+                if (this.timerInterval) {
+                    clearInterval(this.timerInterval);
+                }
+                this.startTime = null;
+            }
+
+            trackTyping() {
+                const inputText = this.typingInput.value;
+                const accuracy = this.calculateAccuracy(inputText);
+                const errors = this.countErrors(inputText);
+
+                this.accuracyDisplay.textContent = `Accuracy: ${accuracy.toFixed(2)}%`;
+                this.errorsDisplay.textContent = `Errors: ${errors}`;
+                this.characterCountDisplay.textContent = `Characters: ${inputText.length}/${this.currentText.length}`;
+
+                if (inputText.length >= this.currentText.length) {
+                    this.completeTest();
+                }
+            }
+
+            completeTest() {
+                clearInterval(this.timerInterval);
+                const endTime = new Date();
+                const totalTime = (endTime - this.startTime) / 1000;
+                this.totalTimeDisplay.textContent = `Total Time: ${totalTime.toFixed(2)} seconds`;
+                this.typingInput.disabled = true;
+            }
+
+            calculateAccuracy(inputText) {
+                const correctChars = inputText.split('').filter((char, index) => 
+                    char === this.currentText[index]
+                ).length;
+                return (correctChars / this.currentText.length) * 100;
+            }
+
+            countErrors(inputText) {
+                return this.currentText.split('').filter((char, index) => 
+                    char !== inputText[index]
+                ).length;
+            }
+
+            changeMode() {
+                const selectedMode = this.modeSelector.value;
+                switch(selectedMode) {
+                    case 'quote':
+                        this.fetchRandomQuote();
+                        break;
+                    case 'code':
+                        this.fetchRandomCode();
+                        break;
+                    default:
+                        this.fetchRandomText();
+                }
+            }
+
+            async fetchRandomQuote() {
+                try {
+                    const response = await axios.get('https://api.quotable.io/random');
+                    this.currentText = response.data.content;
+                    this.textDisplay.textContent = this.currentText;
+                    this.resetTyping();
+                } catch (error) {
+                    this.textDisplay.textContent = 'Failed to fetch quote. Please try again.';
+                }
+            }
+
+            async fetchRandomCode() {
+                try {
+                    const response = await axios.get('https://random-data-api.com/api/code/random_code');
+                    this.currentText = response.data.snippet;
+                    this.textDisplay.textContent = this.currentText;
+                    this.resetTyping();
+                } catch (error) {
+                    this.textDisplay.textContent = 'Failed to fetch code snippet. Please try again.';
+                }
+            }
+        }
+
+        // Initialize the app
+        new TypingApp();
+    </script>
+</body>
+</html>
