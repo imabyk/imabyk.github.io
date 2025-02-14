@@ -330,30 +330,40 @@
                 this.wrongWordsResult.textContent = wrongWords;
                 
                 // Generate sample summary
-                const firstFewWords = inputWords.slice(0, 3).join(' ');
-                const firstFewOrigWords = originalWords.slice(0, 3).join(' ');
-                this.summaryText.innerHTML = this.generateSummary(firstFewWords, firstFewOrigWords);
+                this.summaryText.innerHTML = this.generateSummary(inputWords, originalWords);
                 
                 // Show detailed results
                 this.simpleResults.classList.add('hidden');
                 this.detailedResults.classList.remove('hidden');
             }
 
-            generateSummary(typed, original) {
+            generateSummary(typedWords, originalWords) {
                 // Create a simple summary with colored text showing mistakes
-                const typedWords = typed.split(' ');
-                const originalWords = original.split(' ');
                 let html = '';
                 
                 for (let i = 0; i < Math.min(typedWords.length, originalWords.length); i++) {
                     if (typedWords[i] === originalWords[i]) {
                         html += typedWords[i] + ' ';
                     } else {
-                        html += `<span style="color:red">${typedWords[i]}</span> [<span style="color:red">${originalWords[i]}</span>] `;
+                        html += `<span style="color:red">${typedWords[i]}</span> [<span style="color:green">${originalWords[i]}</span>] `;
                     }
                 }
                 
-                return html + ' are a <span style="color:red">dfasdj</span> [<span style="color:red">fascinating</span>]';
+                // Handle extra words in typed text
+                if (typedWords.length > originalWords.length) {
+                    for (let i = originalWords.length; i < typedWords.length; i++) {
+                        html += `<span style="color:red">${typedWords[i]}</span> `;
+                    }
+                }
+                
+                // Handle missing words in typed text
+                if (originalWords.length > typedWords.length) {
+                    for (let i = typedWords.length; i < originalWords.length; i++) {
+                        html += `[<span style="color:green">${originalWords[i]}</span>] `;
+                    }
+                }
+                
+                return html;
             }
 
             calculateAccuracy(inputText) {
