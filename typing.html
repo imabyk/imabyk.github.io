@@ -30,6 +30,30 @@
         <div class="flex-grow flex flex-col items-center justify-center p-4">
             <!-- Typing Area -->
             <div id="typing-container" class="w-full max-w-2xl bg-white p-6 rounded-lg shadow-md">
+                <!-- Settings -->
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div class="flex flex-col">
+                        <label for="duration-select" class="mb-1 text-sm font-medium text-gray-700">Test Duration</label>
+                        <select id="duration-select" class="p-2 border rounded">
+                            <option value="0">No time limit</option>
+                            <option value="60">1 minute</option>
+                            <option value="120">2 minutes</option>
+                            <option value="180">3 minutes</option>
+                            <option value="300">5 minutes</option>
+                        </select>
+                    </div>
+                    <div class="flex flex-col">
+                        <label for="character-limit-select" class="mb-1 text-sm font-medium text-gray-700">Character Limit</label>
+                        <select id="character-limit-select" class="p-2 border rounded">
+                            <option value="500">500 characters</option>
+                            <option value="1000">1000 characters</option>
+                            <option value="2000">2000 characters</option>
+                            <option value="3000">3000 characters</option>
+                            <option value="0">No limit</option>
+                        </select>
+                    </div>
+                </div>
+
                 <div id="text-display" class="mb-4 text-lg text-gray-700 h-40 overflow-auto border p-2"></div>
                 
                 <div class="flex items-center mb-4">
@@ -78,10 +102,15 @@
                 this.modeSelector = document.getElementById('mode-selector');
                 this.startTestButton = document.getElementById('start-test');
                 this.timerDisplay = document.getElementById('timer');
+                this.durationSelect = document.getElementById('duration-select');
+                this.characterLimitSelect = document.getElementById('character-limit-select');
 
                 this.currentText = '';
                 this.startTime = null;
                 this.timerInterval = null;
+                this.testDuration = 0;
+                this.characterLimit = 500;
+                this.isTestActive = false;
 
                 this.init();
             }
@@ -95,12 +124,31 @@
                 this.typingInput.addEventListener('input', () => this.trackTyping());
                 this.modeSelector.addEventListener('change', () => this.changeMode());
                 this.startTestButton.addEventListener('click', () => this.startTest());
+                this.durationSelect.addEventListener('change', () => this.updateSettings());
+                this.characterLimitSelect.addEventListener('change', () => this.updateSettings());
+            }
+
+            updateSettings() {
+                this.testDuration = parseInt(this.durationSelect.value);
+                this.characterLimit = parseInt(this.characterLimitSelect.value);
+                
+                // Fetch new text based on character limit if needed
+                if (this.characterLimit > 0 && this.currentText.length !== this.characterLimit) {
+                    this.fetchRandomText();
+                }
             }
 
             async fetchRandomText() {
                 try {
-                    const response = await axios.get('https://baconipsum.com/api/?type=meat-and-filler&sentences=10');
-                    this.currentText = response.data[0];
+                    if (this.characterLimit === 0) {
+                        const response = await axios.get('https://baconipsum.com/api/?type=meat-and-filler&sentences=10');
+                        this.currentText = response.data[0];
+                    } else {
+                        // Fetch more text than needed and then slice
+                        const sentences = Math.ceil(this.characterLimit / 50); // Rough estimate
+                        const response = await axios.get(`https://baconipsum.com/api/?type=meat-and-filler&sentences=${sentences}`);
+                        this.currentText = response.data[0].slice(0, this.characterLimit);
+                    }
                     this.textDisplay.textContent = this.currentText;
                     this.resetTyping();
                 } catch (error) {
@@ -112,11 +160,22 @@
                 this.typingInput.disabled = false;
                 this.typingInput.focus();
                 this.startTestButton.disabled = true;
+                this.isTestActive = true;
                 this.startTimer();
             }
 
             startTimer() {
                 this.startTime = new Date();
+                
+                // Setup automatic end if there's a time limit
+                if (this.testDuration > 0) {
+                    setTimeout(() => {
+                        if (this.isTestActive) {
+                            this.completeTest();
+                        }
+                    }, this.testDuration * 1000);
+                }
+                
                 this.timerInterval = setInterval(() => {
                     const currentTime = new Date();
                     const elapsedTime = new Date(currentTime - this.startTime);
@@ -135,6 +194,7 @@
                 this.characterCountDisplay.textContent = '';
                 this.totalTimeDisplay.textContent = '';
                 this.timerDisplay.textContent = '00:00';
+                this.isTestActive = false;
                 
                 if (this.timerInterval) {
                     clearInterval(this.timerInterval);
@@ -143,6 +203,8 @@
             }
 
             trackTyping() {
+                if (!this.isTestActive) return;
+                
                 const inputText = this.typingInput.value;
                 const accuracy = this.calculateAccuracy(inputText);
                 const errors = this.countErrors(inputText);
@@ -157,6 +219,9 @@
             }
 
             completeTest() {
+                if (!this.isTestActive) return;
+                
+                this.isTestActive = false;
                 clearInterval(this.timerInterval);
                 const endTime = new Date();
                 const totalTime = (endTime - this.startTime) / 1000;
@@ -168,13 +233,24 @@
                 const correctChars = inputText.split('').filter((char, index) => 
                     char === this.currentText[index]
                 ).length;
-                return (correctChars / this.currentText.length) * 100;
+                
+                // If no input yet, return 100
+                if (inputText.length === 0) return 100;
+                
+                return (correctChars / Math.min(inputText.length, this.currentText.length)) * 100;
             }
 
             countErrors(inputText) {
-                return this.currentText.split('').filter((char, index) => 
-                    char !== inputText[index]
-                ).length;
+                let errors = 0;
+                const minLength = Math.min(inputText.length, this.currentText.length);
+                
+                for (let i = 0; i < minLength; i++) {
+                    if (inputText[i] !== this.currentText[i]) {
+                        errors++;
+                    }
+                }
+                
+                return errors;
             }
 
             changeMode() {
@@ -195,6 +271,9 @@
                 try {
                     const response = await axios.get('https://api.quotable.io/random');
                     this.currentText = response.data.content;
+                    if (this.characterLimit > 0 && this.currentText.length > this.characterLimit) {
+                        this.currentText = this.currentText.slice(0, this.characterLimit);
+                    }
                     this.textDisplay.textContent = this.currentText;
                     this.resetTyping();
                 } catch (error) {
@@ -206,6 +285,9 @@
                 try {
                     const response = await axios.get('https://random-data-api.com/api/code/random_code');
                     this.currentText = response.data.snippet;
+                    if (this.characterLimit > 0 && this.currentText.length > this.characterLimit) {
+                        this.currentText = this.currentText.slice(0, this.characterLimit);
+                    }
                     this.textDisplay.textContent = this.currentText;
                     this.resetTyping();
                 } catch (error) {
