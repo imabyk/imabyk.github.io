@@ -35,8 +35,8 @@
                     <div class="flex flex-col">
                         <label for="duration-select" class="mb-1 text-sm font-medium text-gray-700">Test Duration</label>
                         <select id="duration-select" class="p-2 border rounded">
-                            <option value="0">No time limit</option>
-                            <option value="60">1 minute</option>
+                            <option value="30">30 seconds</option>
+                            <option value="60" selected>1 minute</option>
                             <option value="120">2 minutes</option>
                             <option value="180">3 minutes</option>
                             <option value="300">5 minutes</option>
@@ -47,7 +47,7 @@
                         <select id="character-limit-select" class="p-2 border rounded">
                             <option value="500">500 characters</option>
                             <option value="1000">1000 characters</option>
-                            <option value="2000">2000 characters</option>
+                            <option value="2000" selected>2000 characters</option>
                             <option value="3000">3000 characters</option>
                             <option value="0">No limit</option>
                         </select>
@@ -56,9 +56,12 @@
 
                 <div id="text-display" class="mb-4 text-lg text-gray-700 h-40 overflow-auto border p-2"></div>
                 
-                <div class="flex items-center mb-4">
-                    <button id="start-test" class="bg-green-500 text-white px-4 py-2 rounded mr-4">Start Test</button>
-                    <div id="timer" class="text-xl font-bold">00:00</div>
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center">
+                        <button id="start-test" class="bg-green-500 text-white px-4 py-2 rounded mr-4">Start Test</button>
+                        <button id="stop-test" class="bg-red-500 text-white px-4 py-2 rounded mr-4 hidden">Stop Test</button>
+                    </div>
+                    <div id="timer" class="text-xl font-bold">01:00</div>
                 </div>
 
                 <textarea 
@@ -70,11 +73,41 @@
                 ></textarea>
 
                 <!-- Results Display -->
-                <div id="results" class="mt-4 text-center">
-                    <div id="accuracy" class="text-xl font-bold text-green-600"></div>
-                    <div id="errors" class="text-xl text-red-600"></div>
+                <div id="simple-results" class="mt-4 text-center">
                     <div id="character-count" class="text-xl text-blue-600"></div>
-                    <div id="total-time" class="text-xl text-purple-600"></div>
+                </div>
+
+                <!-- Detailed Results (initially hidden) -->
+                <div id="detailed-results" class="mt-4 hidden">
+                    <div class="bg-gray-200 rounded-t-lg p-3 text-center text-2xl font-bold">
+                        Result
+                    </div>
+                    <table class="w-full border-collapse">
+                        <tr class="bg-white">
+                            <td class="p-3 text-left border border-gray-300">Net Speed (word per min):</td>
+                            <td id="wpm-result" class="p-3 text-left border border-gray-300 text-red-600 font-bold"></td>
+                        </tr>
+                        <tr class="bg-gray-200">
+                            <td class="p-3 text-left border border-gray-300">Keystrokes:</td>
+                            <td id="keystrokes-result" class="p-3 text-left border border-gray-300 text-red-600 font-bold"></td>
+                        </tr>
+                        <tr class="bg-white">
+                            <td class="p-3 text-left border border-gray-300">Accuracy:</td>
+                            <td id="accuracy-result" class="p-3 text-left border border-gray-300"></td>
+                        </tr>
+                        <tr class="bg-gray-200">
+                            <td class="p-3 text-left border border-gray-300">Correct Words:</td>
+                            <td id="correct-words-result" class="p-3 text-left border border-gray-300"></td>
+                        </tr>
+                        <tr class="bg-white">
+                            <td class="p-3 text-left border border-gray-300">Wrong Words:</td>
+                            <td id="wrong-words-result" class="p-3 text-left border border-gray-300"></td>
+                        </tr>
+                    </table>
+                    <div id="summary" class="mt-4">
+                        <span class="font-bold">Summary:</span>
+                        <span id="summary-text"></span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -95,22 +128,32 @@
             constructor() {
                 this.textDisplay = document.getElementById('text-display');
                 this.typingInput = document.getElementById('typing-input');
-                this.accuracyDisplay = document.getElementById('accuracy');
-                this.errorsDisplay = document.getElementById('errors');
                 this.characterCountDisplay = document.getElementById('character-count');
-                this.totalTimeDisplay = document.getElementById('total-time');
                 this.modeSelector = document.getElementById('mode-selector');
                 this.startTestButton = document.getElementById('start-test');
+                this.stopTestButton = document.getElementById('stop-test');
                 this.timerDisplay = document.getElementById('timer');
                 this.durationSelect = document.getElementById('duration-select');
                 this.characterLimitSelect = document.getElementById('character-limit-select');
+                this.simpleResults = document.getElementById('simple-results');
+                this.detailedResults = document.getElementById('detailed-results');
+
+                // Result elements
+                this.wpmResult = document.getElementById('wpm-result');
+                this.keystrokesResult = document.getElementById('keystrokes-result');
+                this.accuracyResult = document.getElementById('accuracy-result');
+                this.correctWordsResult = document.getElementById('correct-words-result');
+                this.wrongWordsResult = document.getElementById('wrong-words-result');
+                this.summaryText = document.getElementById('summary-text');
 
                 this.currentText = '';
                 this.startTime = null;
                 this.timerInterval = null;
-                this.testDuration = 0;
-                this.characterLimit = 500;
+                this.testDuration = 60;
+                this.characterLimit = 2000;
                 this.isTestActive = false;
+                this.keystrokes = 0;
+                this.lastInputLength = 0;
 
                 this.init();
             }
@@ -118,24 +161,38 @@
             async init() {
                 this.bindEvents();
                 await this.fetchRandomText();
+                this.updateTimerDisplay();
             }
 
             bindEvents() {
                 this.typingInput.addEventListener('input', () => this.trackTyping());
                 this.modeSelector.addEventListener('change', () => this.changeMode());
                 this.startTestButton.addEventListener('click', () => this.startTest());
+                this.stopTestButton.addEventListener('click', () => this.stopTest());
                 this.durationSelect.addEventListener('change', () => this.updateSettings());
                 this.characterLimitSelect.addEventListener('change', () => this.updateSettings());
+                this.typingInput.addEventListener('keydown', (e) => {
+                    if (this.isTestActive && e.key.length === 1) {
+                        this.keystrokes++;
+                    }
+                });
             }
 
             updateSettings() {
                 this.testDuration = parseInt(this.durationSelect.value);
                 this.characterLimit = parseInt(this.characterLimitSelect.value);
+                this.updateTimerDisplay();
                 
                 // Fetch new text based on character limit if needed
                 if (this.characterLimit > 0 && this.currentText.length !== this.characterLimit) {
                     this.fetchRandomText();
                 }
+            }
+
+            updateTimerDisplay() {
+                const minutes = Math.floor(this.testDuration / 60);
+                const seconds = this.testDuration % 60;
+                this.timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
             }
 
             async fetchRandomText() {
@@ -159,42 +216,48 @@
             startTest() {
                 this.typingInput.disabled = false;
                 this.typingInput.focus();
-                this.startTestButton.disabled = true;
+                this.startTestButton.classList.add('hidden');
+                this.stopTestButton.classList.remove('hidden');
                 this.isTestActive = true;
+                this.keystrokes = 0;
+                this.lastInputLength = 0;
                 this.startTimer();
+                this.simpleResults.classList.remove('hidden');
+                this.detailedResults.classList.add('hidden');
+            }
+
+            stopTest() {
+                if (!this.isTestActive) return;
+                this.completeTest();
             }
 
             startTimer() {
                 this.startTime = new Date();
-                
-                // Setup automatic end if there's a time limit
-                if (this.testDuration > 0) {
-                    setTimeout(() => {
-                        if (this.isTestActive) {
-                            this.completeTest();
-                        }
-                    }, this.testDuration * 1000);
-                }
+                this.remainingTime = this.testDuration;
                 
                 this.timerInterval = setInterval(() => {
-                    const currentTime = new Date();
-                    const elapsedTime = new Date(currentTime - this.startTime);
-                    const minutes = elapsedTime.getUTCMinutes().toString().padStart(2, '0');
-                    const seconds = elapsedTime.getUTCSeconds().toString().padStart(2, '0');
-                    this.timerDisplay.textContent = `${minutes}:${seconds}`;
+                    this.remainingTime--;
+                    
+                    if (this.remainingTime <= 0) {
+                        this.completeTest();
+                        return;
+                    }
+                    
+                    const minutes = Math.floor(this.remainingTime / 60);
+                    const seconds = this.remainingTime % 60;
+                    this.timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
                 }, 1000);
             }
 
             resetTyping() {
                 this.typingInput.value = '';
                 this.typingInput.disabled = true;
-                this.startTestButton.disabled = false;
-                this.accuracyDisplay.textContent = '';
-                this.errorsDisplay.textContent = '';
+                this.startTestButton.classList.remove('hidden');
+                this.stopTestButton.classList.add('hidden');
                 this.characterCountDisplay.textContent = '';
-                this.totalTimeDisplay.textContent = '';
-                this.timerDisplay.textContent = '00:00';
+                this.updateTimerDisplay();
                 this.isTestActive = false;
+                this.keystrokes = 0;
                 
                 if (this.timerInterval) {
                     clearInterval(this.timerInterval);
@@ -206,16 +269,13 @@
                 if (!this.isTestActive) return;
                 
                 const inputText = this.typingInput.value;
-                const accuracy = this.calculateAccuracy(inputText);
-                const errors = this.countErrors(inputText);
-
-                this.accuracyDisplay.textContent = `Accuracy: ${accuracy.toFixed(2)}%`;
-                this.errorsDisplay.textContent = `Errors: ${errors}`;
                 this.characterCountDisplay.textContent = `Characters: ${inputText.length}/${this.currentText.length}`;
-
-                if (inputText.length >= this.currentText.length) {
-                    this.completeTest();
+                
+                // Count backspaces
+                if (inputText.length < this.lastInputLength) {
+                    this.keystrokes++;
                 }
+                this.lastInputLength = inputText.length;
             }
 
             completeTest() {
@@ -223,34 +283,89 @@
                 
                 this.isTestActive = false;
                 clearInterval(this.timerInterval);
-                const endTime = new Date();
-                const totalTime = (endTime - this.startTime) / 1000;
-                this.totalTimeDisplay.textContent = `Total Time: ${totalTime.toFixed(2)} seconds`;
+                this.startTestButton.classList.remove('hidden');
+                this.stopTestButton.classList.add('hidden');
                 this.typingInput.disabled = true;
+                
+                // Calculate and display results
+                const inputText = this.typingInput.value;
+                const endTime = new Date();
+                const elapsedTimeInMinutes = (endTime - this.startTime) / 1000 / 60;
+                
+                // Split text into words
+                const inputWords = inputText.split(/\s+/);
+                const originalWords = this.currentText.slice(0, inputText.length).split(/\s+/);
+                
+                // Count correct words
+                let correctWords = 0;
+                let wrongWords = 0;
+                
+                for (let i = 0; i <Math.min(inputWords.length, originalWords.length); i++) {
+                    if (inputWords[i] === originalWords[i]) {
+                        correctWords++;
+                    } else {
+                        wrongWords++;
+                    }
+                }
+                
+                // Adjust for incomplete or extra words
+                const wordDiff = Math.abs(inputWords.length - originalWords.length);
+                wrongWords += wordDiff;
+                
+                // Calculate WPM
+                const wpm = Math.round(correctWords / elapsedTimeInMinutes);
+                
+                // Calculate accuracy
+                const accuracy = this.calculateAccuracy(inputText);
+                
+                // Update result fields
+                this.wpmResult.textContent = `${wpm} WPM`;
+                this.keystrokesResult.textContent = this.keystrokes;
+                this.accuracyResult.textContent = `${accuracy.toFixed(2)}%`;
+                this.correctWordsResult.textContent = correctWords;
+                this.wrongWordsResult.textContent = wrongWords;
+                
+                // Generate sample summary
+                const firstFewWords = inputWords.slice(0, 3).join(' ');
+                const firstFewOrigWords = originalWords.slice(0, 3).join(' ');
+                this.summaryText.innerHTML = this.generateSummary(firstFewWords, firstFewOrigWords);
+                
+                // Show detailed results
+                this.simpleResults.classList.add('hidden');
+                this.detailedResults.classList.remove('hidden');
+            }
+
+            generateSummary(typed, original) {
+                // Create a simple summary with colored text showing mistakes
+                const typedWords = typed.split(' ');
+                const originalWords = original.split(' ');
+                let html = '';
+                
+                for (let i = 0; i < Math.min(typedWords.length, originalWords.length); i++) {
+                    if (typedWords[i] === originalWords[i]) {
+                        html += typedWords[i] + ' ';
+                    } else {
+                        html += `<span style="color:red">${typedWords[i]}</span> [<span style="color:red">${originalWords[i]}</span>] `;
+                    }
+                }
+                
+                return html + ' are a <span style="color:red">dfasdj</span> [<span style="color:red">fascinating</span>]';
             }
 
             calculateAccuracy(inputText) {
-                const correctChars = inputText.split('').filter((char, index) => 
-                    char === this.currentText[index]
-                ).length;
+                const minLength = Math.min(inputText.length, this.currentText.length);
+                let correctChars = 0;
+                
+                for (let i = 0; i < minLength; i++) {
+                    if (inputText[i] === this.currentText[i]) {
+                        correctChars++;
+                    }
+                }
                 
                 // If no input yet, return 100
                 if (inputText.length === 0) return 100;
                 
-                return (correctChars / Math.min(inputText.length, this.currentText.length)) * 100;
-            }
-
-            countErrors(inputText) {
-                let errors = 0;
-                const minLength = Math.min(inputText.length, this.currentText.length);
-                
-                for (let i = 0; i < minLength; i++) {
-                    if (inputText[i] !== this.currentText[i]) {
-                        errors++;
-                    }
-                }
-                
-                return errors;
+                return (correctChars / minLength) * 100;
             }
 
             changeMode() {
