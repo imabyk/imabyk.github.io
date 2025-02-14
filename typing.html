@@ -193,6 +193,7 @@
                     }
                     const data = await response.json();
                     this.jsonParagraph.textContent = data.paragraph;
+                    return data.paragraph;
                 } catch (error) {
                     console.error('Failed to fetch JSON file:', error);
                     this.jsonParagraph.textContent = 'Default paragraph content.';
@@ -219,8 +220,11 @@
             async fetchRandomText() {
                 try {
                     if (this.characterLimit === 0) {
-                        const response = await axios.get('https://baconipsum.com/api/?type=meat-and-filler&sentences=10');
-                        this.currentText = response.data[0];
+                        // const response = await axios.get('https://baconipsum.com/api/?type=meat-and-filler&sentences=10');
+                        
+                        
+                        // this.currentText = response.data[0];
+                        this.currentText = populateParagraphFromJson();
                     } else {
                         // Fetch more text than needed and then slice
                         const sentences = Math.ceil(this.characterLimit / 50); // Rough estimate
