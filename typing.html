@@ -162,9 +162,8 @@
 
             async init() {
                 this.bindEvents();
-                await this.fetchRandomText();
+                await this.populateParagraphFromJson();
                 this.updateTimerDisplay();
-                this.populateParagraphFromJson();
             }
 
             bindEvents() {
@@ -192,11 +191,12 @@
                         throw new Error('JSON file not found');
                     }
                     const data = await response.json();
-                    this.jsonParagraph.textContent = data.paragraph;
-                    return data.paragraph;
+                    this.currentText = data.paragraph;
+                    this.textDisplay.textContent = this.currentText;
+                    this.resetTyping();
                 } catch (error) {
                     console.error('Failed to fetch JSON file:', error);
-                    this.jsonParagraph.textContent = 'Default paragraph content.';
+                    this.textDisplay.textContent = 'Default paragraph content.';
                 }
             }
 
@@ -207,7 +207,7 @@
                 
                 // Fetch new text based on character limit if needed
                 if (this.characterLimit > 0 && this.currentText.length !== this.characterLimit) {
-                    this.fetchRandomText();
+                    this.populateParagraphFromJson();
                 }
             }
 
@@ -215,27 +215,6 @@
                 const minutes = Math.floor(this.testDuration / 60);
                 const seconds = this.testDuration % 60;
                 this.timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-            }
-
-            async fetchRandomText() {
-                try {
-                    if (this.characterLimit === 0) {
-                        // const response = await axios.get('https://baconipsum.com/api/?type=meat-and-filler&sentences=10');
-                        
-                        
-                        // this.currentText = response.data[0];
-                        this.currentText = populateParagraphFromJson();
-                    } else {
-                        // Fetch more text than needed and then slice
-                        const sentences = Math.ceil(this.characterLimit / 50); // Rough estimate
-                        const response = await axios.get(`https://baconipsum.com/api/?type=meat-and-filler&sentences=${sentences}`);
-                        this.currentText = response.data[0].slice(0, this.characterLimit);
-                    }
-                    this.textDisplay.textContent = this.currentText;
-                    this.resetTyping();
-                } catch (error) {
-                    this.textDisplay.textContent = 'Failed to fetch text. Please try again.';
-                }
             }
 
             startTest() {
@@ -397,41 +376,13 @@
                 const selectedMode = this.modeSelector.value;
                 switch(selectedMode) {
                     case 'quote':
-                        this.fetchRandomQuote();
+                        this.populateParagraphFromJson();
                         break;
                     case 'code':
-                        this.fetchRandomCode();
+                        this.populateParagraphFromJson();
                         break;
                     default:
-                        this.fetchRandomText();
-                }
-            }
-
-            async fetchRandomQuote() {
-                try {
-                    const response = await axios.get('https://api.quotable.io/random');
-                    this.currentText = response.data.content;
-                    if (this.characterLimit > 0 && this.currentText.length > this.characterLimit) {
-                        this.currentText = this.currentText.slice(0, this.characterLimit);
-                    }
-                    this.textDisplay.textContent = this.currentText;
-                    this.resetTyping();
-                } catch (error) {
-                    this.textDisplay.textContent = 'Failed to fetch quote. Please try again.';
-                }
-            }
-
-            async fetchRandomCode() {
-                try {
-                    const response = await axios.get('https://random-data-api.com/api/code/random_code');
-                    this.currentText = response.data.snippet;
-                    if (this.characterLimit > 0 && this.currentText.length > this.characterLimit) {
-                        this.currentText = this.currentText.slice(0, this.characterLimit);
-                    }
-                    this.textDisplay.textContent = this.currentText;
-                    this.resetTyping();
-                } catch (error) {
-                    this.textDisplay.textContent = 'Failed to fetch code snippet. Please try again.';
+                        this.populateParagraphFromJson();
                 }
             }
         }
