@@ -55,6 +55,7 @@
                 </div>
 
                 <div id="text-display" class="mb-4 text-lg text-gray-700 h-40 overflow-auto border p-2"></div>
+                <p id="json-paragraph" class="mb-4 text-lg text-gray-700"></p>
                 
                 <div class="flex items-center justify-between mb-4">
                     <div class="flex items-center">
@@ -137,6 +138,7 @@
                 this.characterLimitSelect = document.getElementById('character-limit-select');
                 this.simpleResults = document.getElementById('simple-results');
                 this.detailedResults = document.getElementById('detailed-results');
+                this.jsonParagraph = document.getElementById('json-paragraph');
 
                 // Result elements
                 this.wpmResult = document.getElementById('wpm-result');
@@ -162,6 +164,7 @@
                 this.bindEvents();
                 await this.fetchRandomText();
                 this.updateTimerDisplay();
+                this.populateParagraphFromJson();
             }
 
             bindEvents() {
@@ -176,6 +179,24 @@
                         this.keystrokes++;
                     }
                 });
+            }
+
+            async populateParagraphFromJson() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const id = urlParams.get('id') || '1';
+                const jsonFilePath = `json/${id}.json`;
+
+                try {
+                    const response = await fetch(jsonFilePath);
+                    if (!response.ok) {
+                        throw new Error('JSON file not found');
+                    }
+                    const data = await response.json();
+                    this.jsonParagraph.textContent = data.paragraph;
+                } catch (error) {
+                    console.error('Failed to fetch JSON file:', error);
+                    this.jsonParagraph.textContent = 'Default paragraph content.';
+                }
             }
 
             updateSettings() {
